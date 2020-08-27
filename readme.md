@@ -1,5 +1,7 @@
 # Lambdac - Lambda Calculus in C
 
+Pronounced "lam-dac" not "lambda-c".  It's a fucking garbage fire waiting to happen.
+
 ## Why?
 
 Because it's a pain in the dick to figure any of this shit out, so I'm doing it the hardest fucking way possible!
