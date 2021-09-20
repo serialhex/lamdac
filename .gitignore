@@ -1,0 +1,4 @@
+lambdac research/
+bin/
+*.exe
+*.obj
