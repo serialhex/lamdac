@@ -33,13 +33,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 /* Lambda expressions are defined recursively, like this:
  *
  *    <expression>  := <name>|<function>|<application>
  *    <function>    := \<name>.<expression>
- *    <application> := <expression><expression>
- *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z' (that is, all the letters)
+ *    <application> := ( <name>|<function> ) <expression>
+ *    <parens>      := '(' <expression>+ ')'
+ *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
+ *                     This gives us 64 different characters to use in our functions
  *
  * So as we figure out how to represent all this, we need to keep all this shindig
  * in our minds...
@@ -77,15 +80,40 @@ typedef struct UL_expression { // BAH!!! https://www.reddit.com/r/c_language/com
 } UL_expression;
 
 // Just some convience functions for doing some stuff...
-UL_expression* ul_name(char var) {
+void EXPLOSION(char* text) {
+  fputs(text, stderr);
+  exit(1);
+}
+
+void EXPECT_OR_EXPLODE(char expected, char token, char* fail_text) {
+  if (!(expected == token)) {
+    EXPLOSION(fail_text);
+  }
+}
+
+#include <Windows.h>
+void P(char c) {
+  printf("%c", c);
+  Sleep(1000);
+}
+
+UL_expression* alloc_ul_expr() {
   UL_expression* expr = (UL_expression*)malloc(sizeof(UL_expression));
+  if (!expr) {
+    EXPLOSION("Ran out of memory, or something else equally bad...");
+  }
+  return expr;
+}
+
+UL_expression* ul_name(char var) {
+  UL_expression* expr = alloc_ul_expr();
   expr->kind = UL_name;
   expr->data.name = var;
   return expr;
 }
 
 UL_expression* ul_function(char var, UL_expression* body) {
-  UL_expression* expr = (UL_expression*)malloc(sizeof(UL_expression));
+  UL_expression* expr = alloc_ul_expr();
   expr->kind = UL_function;
   expr->data.lambda.name = var;
   expr->data.lambda.body = body;
@@ -93,14 +121,14 @@ UL_expression* ul_function(char var, UL_expression* body) {
 }
 
 UL_expression* ul_application(UL_expression* left, UL_expression* right) {
-  UL_expression* expr = (UL_expression*)malloc(sizeof(UL_expression));
+  UL_expression* expr = alloc_ul_expr();
   expr->kind = UL_application;
   expr->data.apply.left = left;
   expr->data.apply.right = right;
   return expr;
 }
 
-// First, lets get some printing done, so we can see the fruits of our labors!
+// Lets get some printing done, so we can see the fruits of our labors!
 // We want to make sure that we are getting what we expect, while also enabling us
 // to copy-and-paste the results of our explorations back into the program.
 // Input -> Output -> Input
@@ -126,32 +154,150 @@ void print_expr(UL_expression* expr) {
 }
 
 // helper for legal variable character names!
-bool varchars(char v) {
-  return ('0' <= v && v <= '9') ||
-         ('A' <= v && v <= 'Z') ||
-         ('a' <= v && v <= 'z');
+bool varchar_p(char v) {
+  return isalnum(v) || v == '@' || v == '#';
 }
 
-// Now we are going to try reading an expression.
-// This will be an easy way to see if printing works completely!
-// Though parsing is rarely easy...
-UL_expression* read_name(char* expr) {
-
+void skip_whitespace(char* src[]) {
+  while (isspace(*src[0])) { *src = *src + 1; }
 }
 
-UL_expression* read_expr(char* expr) {
+// Prototypes!
+bool read_expr(char* src[]);
+bool read_app(char* src[]);
+bool read_fun(char* src[]);
+bool read_paren(char* src[]);
+
+bool read_name(char* src[]) {
+  P('v');
+  char* orig = *src;
+
+  skip_whitespace(src);
+  if (varchar_p(*src[0])) {
+    // expr = ul_name(*src[0]);
+    *src = *src + 1;
+    return true;
+  }
+
+  *src = orig;
+  P('\b');
+  return false;
+}
+
+bool read_paren(char* src[]) {
+  P('(');
+  char* orig = *src;
+  skip_whitespace(src);
+
+  if (!(*src[0] == '(')) {
+    *src = orig;
+    P('\b');
+    return false;
+  }
+
+  read_expr(src);
+
+  EXPECT_OR_EXPLODE(')', *src[0], "Mismatched Parens!!! EXPLOSION!!!!");
+
+  return true;
+}
+
+bool read_fun(char* src[]) {
+  P('\\');
+  char* orig = *src;
+  skip_whitespace(src);
+
+  if (!(*src[0] == '\\')) {
+    // early exit
+    *src = orig;
+    P('\b');
+    return false;
+  }
+
+  // It's a lambda!
+  *src = *src + 1;
+
+  if (!varchar_p((char)*src[0])) {
+    // it's not a well-formed lambda...
+    EXPLOSION("You need a variable after the lambda!");
+  }
+
+  // grab the variable
+  char var = *src[0];
+  *src = *src + 1;
+
+  EXPECT_OR_EXPLODE('.', *src[0], "You need a period after the variable");
+  *src = *src + 1;
+
+  // UL_expression* body = NULL;
+
+  if (!(read_app(src) || read_expr(src))) {
+    EXPLOSION("No body in lambda...");
+  }
+
+  // expr = ul_function(var, body);
+  return true;
+}
+
+bool read_app(char* src[]) {
+  P('@');
+  char* orig = *src;
+  skip_whitespace(src);
+
+  // left-branch
+  if (!(read_name(src)
+     || read_paren(src)
+     || read_fun(src))) {
+    *src = orig;
+    P('\b');
+    return false;
+  }
+
+  // right-branch
+  if (!read_expr(src)) {
+    *src = orig;
+    P('\b');
+    return false;
+  }
+
+  return true;
+}
+
+bool read_expr(char* src[]) {
+  P('!');
+  char* orig = *src;
+  if (read_name(src)
+   || read_paren(src)
+   || read_fun(src)
+   || read_app(src)) {
+     // good stuff happened!
+     return true;
+   }
+
+  *src = orig;
+  P('\b');
+  return false;
 }
 
 /*******************************************************************************
  * Here we do some weird things to enable some testing...
- * We are defining a function (in this case the identity function) and then 2 UL_expressions,
- * one simply holds a variable (which we need for the next one), and the next which
- * is the actual function.
+ * We are defining a function (in this case the identity function) and then 2
+ * UL_expressions, one simply holds a variable (which we need for the next one),
+ * and the next which is the actual function.
  */
-char* example_in = "\\x.x";
+char* example_in = "\\x.xy(\\y.x)";
 UL_expression example_var = { .kind = UL_name, .data = { .name = 'x'}};
 UL_expression example_out = { .kind = UL_function, .data = { .lambda = { .name = 'x', .body = &example_var}}};
 
 int main(int argc, char* argv[]) {
-  print_expr(&example_out);
+  UL_expression* expr;
+
+  char* src = example_in;
+
+  if (read_expr(&src)) {
+    printf("\nWe read a thing!\n");
+    // print_expr(expr);
+  } else {
+    printf("\nWe read nothing...\n");
+  }
 }
