@@ -39,10 +39,25 @@
  *
  *    <expression>  := <name>|<function>|<application>
  *    <function>    := \<name>.<expression>
- *    <application> := ( <name>|<function> ) <expression>
+ *    <application> := <expression> <expression>
  *    <parens>      := '(' <expression>+ ')'
  *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
  *                     This gives us 64 different characters to use in our functions
+ *
+ * But this is left-recursive, so we need to fix that and make something that
+ * isn't.  Also, it suffers from the fact that it ends as soon as it can.  This
+ * non-greedy behavior means that "x \y.x" only consumes the first variable, not
+ * the lambda term that follows.
+ *
+ *    <expression>  := <application>|<parens>|<function>|<name>
+ *    <function>    := \<name>.<expression>
+ *    <application> := ( <parens>|<function>|<name> ) <expression>
+ *    <parens>      := '(' <expression>+ ')'
+ *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
+ *
+ * name, function and parens hasn't changed, but we changed the order for
+ * expression, and made application look for either a name or function, then
+ * some expression, that way it doesn't left-recurse all the time.
  *
  * So as we figure out how to represent all this, we need to keep all this shindig
  * in our minds...
@@ -245,9 +260,9 @@ bool read_app(char* src[]) {
   skip_whitespace(src);
 
   // left-branch
-  if (!(read_name(src)
-     || read_paren(src)
-     || read_fun(src))) {
+  if (!(read_paren(src)
+     || read_fun(src)
+     || read_name(src))) {
     *src = orig;
     P('\b');
     return false;
@@ -266,10 +281,7 @@ bool read_app(char* src[]) {
 bool read_expr(char* src[]) {
   P('!');
   char* orig = *src;
-  if (read_name(src)
-   || read_paren(src)
-   || read_fun(src)
-   || read_app(src)) {
+  if (read_app(src)) {
      // good stuff happened!
      return true;
    }
@@ -285,7 +297,7 @@ bool read_expr(char* src[]) {
  * UL_expressions, one simply holds a variable (which we need for the next one),
  * and the next which is the actual function.
  */
-char* example_in = "\\x.xy(\\y.x)";
+char* example_in = "x\\x.xy(\\y.x)";
 UL_expression example_var = { .kind = UL_name, .data = { .name = 'x'}};
 UL_expression example_out = { .kind = UL_function, .data = { .lambda = { .name = 'x', .body = &example_var}}};
 
