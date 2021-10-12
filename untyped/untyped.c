@@ -63,6 +63,34 @@
  * in our minds...
  */
 
+// Just some convience functions for error checking & stuff...
+void EXPLOSION(char* text) {
+  fputs(text, stderr);
+  exit(1);
+}
+
+void EXPECT_OR_EXPLODE(char expected, char token, char* fail_text) {
+  if (!(expected == token)) {
+    EXPLOSION(fail_text);
+  }
+}
+
+#define WATCH 0
+
+#include <Windows.h>
+void P(char c) {
+#if WATCH
+  printf("%c", c);
+  Sleep(100);
+#endif
+}
+
+void Bk() {
+#if WATCH
+  printf("\b \b");
+#endif
+}
+
 // I guess the first thing is a set of enums for the kinds of things we are dealing
 // with and a struct describing our data.
 typedef enum {
@@ -94,23 +122,6 @@ typedef struct UL_expression { // BAH!!! https://www.reddit.com/r/c_language/com
   } data;
 } UL_expression;
 
-// Just some convience functions for doing some stuff...
-void EXPLOSION(char* text) {
-  fputs(text, stderr);
-  exit(1);
-}
-
-void EXPECT_OR_EXPLODE(char expected, char token, char* fail_text) {
-  if (!(expected == token)) {
-    EXPLOSION(fail_text);
-  }
-}
-
-#include <Windows.h>
-void P(char c) {
-  printf("%c", c);
-  Sleep(1000);
-}
 
 UL_expression* alloc_ul_expr() {
   UL_expression* expr = (UL_expression*)malloc(sizeof(UL_expression));
@@ -148,6 +159,8 @@ UL_expression* ul_application(UL_expression* left, UL_expression* right) {
 // to copy-and-paste the results of our explorations back into the program.
 // Input -> Output -> Input
 void print_expr(UL_expression* expr) {
+  if (!expr) { EXPLOSION("EXPRESSION IS NULL!!!"); }
+
   switch (expr->kind) {
     case UL_name: {
       printf("%c", expr->data.name);
@@ -160,10 +173,12 @@ void print_expr(UL_expression* expr) {
     } break;
 
     case UL_application: {
+      printf("(");
       // RECURSE!!!
       if (expr->data.apply.left) { print_expr(expr->data.apply.left); }
       // TWICE!!!
       if (expr->data.apply.right) { print_expr(expr->data.apply.right); }
+      printf(")");
     } break;
   }
 }
@@ -178,46 +193,49 @@ void skip_whitespace(char* src[]) {
 }
 
 // Prototypes!
-bool read_expr(char* src[]);
-bool read_app(char* src[]);
-bool read_fun(char* src[]);
-bool read_paren(char* src[]);
+UL_expression* read_expr(char* src[]);
+UL_expression* read_app(char* src[]);
+UL_expression* read_fun(char* src[]);
+UL_expression* read_paren(char* src[]);
 
-bool read_name(char* src[]) {
+UL_expression* read_name(char* src[]) {
   P('v');
   char* orig = *src;
+  UL_expression* expr;
 
   skip_whitespace(src);
   if (varchar_p(*src[0])) {
-    // expr = ul_name(*src[0]);
+    expr = ul_name(*src[0]);
     *src = *src + 1;
-    return true;
+    return expr;
   }
 
+  // Didn't find what we are looking for
   *src = orig;
-  P('\b');
-  return false;
+  Bk();
+  return NULL;
 }
 
-bool read_paren(char* src[]) {
+UL_expression* read_paren(char* src[]) {
   P('(');
   char* orig = *src;
   skip_whitespace(src);
 
   if (!(*src[0] == '(')) {
     *src = orig;
-    P('\b');
-    return false;
+    Bk();
+    return NULL;
   }
 
-  read_expr(src);
+  *src = *src + 1; // nom the paren and get the expression
+  UL_expression* expr = read_expr(src);
 
   EXPECT_OR_EXPLODE(')', *src[0], "Mismatched Parens!!! EXPLOSION!!!!");
 
-  return true;
+  return expr;
 }
 
-bool read_fun(char* src[]) {
+UL_expression* read_fun(char* src[]) {
   P('\\');
   char* orig = *src;
   skip_whitespace(src);
@@ -225,8 +243,8 @@ bool read_fun(char* src[]) {
   if (!(*src[0] == '\\')) {
     // early exit
     *src = orig;
-    P('\b');
-    return false;
+    Bk();
+    return NULL;
   }
 
   // It's a lambda!
@@ -244,52 +262,60 @@ bool read_fun(char* src[]) {
   EXPECT_OR_EXPLODE('.', *src[0], "You need a period after the variable");
   *src = *src + 1;
 
-  // UL_expression* body = NULL;
+  UL_expression* body = NULL;
 
-  if (!(read_app(src) || read_expr(src))) {
+  if (!(body = read_expr(src))) {
     EXPLOSION("No body in lambda...");
   }
 
-  // expr = ul_function(var, body);
-  return true;
+  UL_expression* expr = ul_function(var, body);
+  return expr;
 }
 
-bool read_app(char* src[]) {
+UL_expression* read_app(char* src[]) {
   P('@');
   char* orig = *src;
   skip_whitespace(src);
 
+  UL_expression* l_expr;
+
   // left-branch
-  if (!(read_paren(src)
-     || read_fun(src)
-     || read_name(src))) {
-    *src = orig;
-    P('\b');
-    return false;
+  if ((l_expr = read_paren(src))
+   || (l_expr = read_fun(src))
+   || (l_expr = read_name(src))) {
+
+      // right-branch
+      UL_expression* r_expr;
+      orig = *src;
+      if (r_expr = read_expr(src)) {
+        return ul_application(l_expr, r_expr);
+      } else {
+        *src = orig;
+        // just return previous result...
+        return l_expr;
+      }
   }
 
-  // right-branch
-  if (!read_expr(src)) {
-    *src = orig;
-    P('\b');
-    return false;
-  }
-
-  return true;
+  *src = orig;
+  Bk();
+  return NULL;
 }
 
-bool read_expr(char* src[]) {
+UL_expression* read_expr(char* src[]) {
   P('!');
   char* orig = *src;
-  if (read_app(src)) {
+  UL_expression* expr;
+
+  if (expr = read_app(src)) {
      // good stuff happened!
-     return true;
+     return expr;
    }
 
   *src = orig;
-  P('\b');
-  return false;
+  Bk();
+  return NULL;
 }
+
 
 /*******************************************************************************
  * Here we do some weird things to enable some testing...
@@ -297,19 +323,27 @@ bool read_expr(char* src[]) {
  * UL_expressions, one simply holds a variable (which we need for the next one),
  * and the next which is the actual function.
  */
+char* t_var = "x";
+char* t_fun = "\\x.x";
+char* t_app = "xy";
+char* t_par = "xy(za)bc";
 char* example_in = "x\\x.xy(\\y.x)";
 UL_expression example_var = { .kind = UL_name, .data = { .name = 'x'}};
 UL_expression example_out = { .kind = UL_function, .data = { .lambda = { .name = 'x', .body = &example_var}}};
+UL_expression* t_expr = NULL;
 
 int main(int argc, char* argv[]) {
-  UL_expression* expr;
+  UL_expression* expr = alloc_ul_expr();
 
-  char* src = example_in;
+  char* src = t_par;
 
-  if (read_expr(&src)) {
+  if (t_expr = read_expr(&src)) {
     printf("\nWe read a thing!\n");
     // print_expr(expr);
   } else {
     printf("\nWe read nothing...\n");
   }
+
+  print_expr(t_expr);
 }
+
