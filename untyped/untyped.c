@@ -40,7 +40,7 @@
  *    <expression>  := <name>|<function>|<application>
  *    <function>    := \<name>.<expression>
  *    <application> := <expression> <expression>
- *    <parens>      := '(' <expression>+ ')'
+ *    <parens>      := '(' <expression>+ ')' <expression>*
  *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
  *                     This gives us 64 different characters to use in our functions
  *
@@ -52,7 +52,7 @@
  *    <expression>  := <application>|<parens>|<function>|<name>
  *    <function>    := \<name>.<expression>
  *    <application> := ( <parens>|<function>|<name> ) <expression>
- *    <parens>      := '(' <expression>+ ')'
+ *    <parens>      := '(' <expression>+ ')' <expression>*
  *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
  *
  * name, function and parens hasn't changed, but we changed the order for
@@ -97,6 +97,7 @@ typedef enum {
   UL_name,
   UL_function,
   UL_application,
+  UL_paren,
 } UL_kind;
 
 struct UL_expression; // forward declaration... because... C!
@@ -117,6 +118,8 @@ typedef struct UL_expression { // BAH!!! https://www.reddit.com/r/c_language/com
       struct UL_expression* left;
       struct UL_expression* right;
     } apply;
+
+    struct UL_expression* expr;
 
     char name;
   } data;
@@ -154,6 +157,13 @@ UL_expression* ul_application(UL_expression* left, UL_expression* right) {
   return expr;
 }
 
+UL_expression* ul_paren(UL_expression* paren) {
+  UL_expression* expr = alloc_ul_expr();
+  expr->kind = UL_paren;
+  expr->data.expr = paren;
+  return expr;
+}
+
 // Lets get some printing done, so we can see the fruits of our labors!
 // We want to make sure that we are getting what we expect, while also enabling us
 // to copy-and-paste the results of our explorations back into the program.
@@ -173,11 +183,15 @@ void print_expr(UL_expression* expr) {
     } break;
 
     case UL_application: {
-      printf("(");
       // RECURSE!!!
       if (expr->data.apply.left) { print_expr(expr->data.apply.left); }
       // TWICE!!!
       if (expr->data.apply.right) { print_expr(expr->data.apply.right); }
+    } break;
+
+    case UL_paren: {
+      printf("(");
+      print_expr(expr->data.expr);
       printf(")");
     } break;
   }
@@ -231,8 +245,11 @@ UL_expression* read_paren(char* src[]) {
   UL_expression* expr = read_expr(src);
 
   EXPECT_OR_EXPLODE(')', *src[0], "Mismatched Parens!!! EXPLOSION!!!!");
+  P(')');
 
-  return expr;
+  *src = *src + 1; // nom the close
+
+  return ul_paren(expr);
 }
 
 UL_expression* read_fun(char* src[]) {
@@ -326,8 +343,8 @@ UL_expression* read_expr(char* src[]) {
 char* t_var = "x";
 char* t_fun = "\\x.x";
 char* t_app = "xy";
-char* t_par = "xy(za)bc";
-char* example_in = "x\\x.xy(\\y.x)";
+char* t_par = "xyd(zang)bc";
+char* example_in = "\\x.xy(\\y.x(zde)yab)";
 UL_expression example_var = { .kind = UL_name, .data = { .name = 'x'}};
 UL_expression example_out = { .kind = UL_function, .data = { .lambda = { .name = 'x', .body = &example_var}}};
 UL_expression* t_expr = NULL;
@@ -335,7 +352,7 @@ UL_expression* t_expr = NULL;
 int main(int argc, char* argv[]) {
   UL_expression* expr = alloc_ul_expr();
 
-  char* src = t_par;
+  char* src = example_in;
 
   if (t_expr = read_expr(&src)) {
     printf("\nWe read a thing!\n");
