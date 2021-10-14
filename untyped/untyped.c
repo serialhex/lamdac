@@ -1,23 +1,5 @@
-/* The untyped lambda calculus
- * because i'm a fucking masochist
- *
- * This is going to be slightly different from typical lambda-calculus in one
- * major way: syntax.  As I'm typing on a keyboard in American, and I use
- * 'merican ass-key to encode all my letters, I don't have the fancy letter
- * lambda and also since I'm not using TeX I can't just type \lambda everywhere.
- *
- * So yeah, the basic syntax:
- *
- * variable    := "a".."z" | variable "'"
- * lambda-term := variable
- *              | "(" lambda-term lambda-term ")"
- *              | "\" variable "(" lambda-term ")"
- *              | "\" variable+ "." lambda-term
- *
- * Note that \x.yx is \x.(yx) and not (\x.y)x (abstraction extends as far right as possible)
- *
- * Maybe I'm making the syntax too complicated?  If I am, I'll scrap it and fix
- * it later... or something.
+/*
+ * First of all... some quick thanks:
  *
  * A lot of this is coming from the article "A Tutorial Introduction to the
  * Lambda Calculus" by Raul Rojas.  It's a really good paper describing the Lambda
@@ -26,23 +8,24 @@
  * Also thanks to https://github.com/mpu/lambda/ for some of the code ideas.
  */
 
-// some includes, so we can use exactly-specified numeric types, and not any of
-// those dirty variable-width bit types.  Also stdio so we can print out the result
-// of any computation we do.
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <ctype.h>
 
-/* Lambda expressions are defined recursively, like this:
+/* The Untyped Lambda Calculus
+ * ...because i'm a fucking masochist
+ *
+ * This is going to be slightly different from typical lambda-calculus in one
+ * major way: syntax.  As I'm typing on a keyboard in American, and I use
+ * 'merican ass-key to encode all my letters, I don't have the fancy letter
+ * lambda and also since I'm not using TeX I can't just type \lambda everywhere.
+ *
+ * Lambda expressions are defined recursively, like this:
  *
  *    <expression>  := <name>|<function>|<application>
  *    <function>    := \<name>.<expression>
  *    <application> := <expression> <expression>
- *    <parens>      := '(' <expression>+ ')' <expression>*
  *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
  *                     This gives us 64 different characters to use in our functions
+ *
+ * Note that \x.yx is treated as \x.(yx) and not (\x.y)x (abstraction extends as far right as possible)
  *
  * But this is left-recursive, so we need to fix that and make something that
  * isn't.  Also, it suffers from the fact that it ends as soon as it can.  This
@@ -62,6 +45,17 @@
  * So as we figure out how to represent all this, we need to keep all this shindig
  * in our minds...
  */
+
+// some includes, so we can use exactly-specified numeric types, and not any of
+// those dirty variable-width bit types.  Also stdio so we can print out the result
+// of any computation we do.
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdbool.h>
+#include <ctype.h>
+
+
 
 // Just some convience functions for error checking & stuff...
 void EXPLOSION(char* text) {
