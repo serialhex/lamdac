@@ -128,6 +128,32 @@ UL_expression* alloc_ul_expr() {
   return expr;
 }
 
+void free_ul_expr(UL_expression* expr) {
+  if (expr == NULL) return;
+
+  switch (expr->kind) {
+    case UL_name: {
+      free(expr);
+    } break;
+
+    case UL_function: {
+      free_ul_expr(expr->data.lambda.body);
+      free(expr);
+    } break;
+
+    case UL_application: {
+      free_ul_expr(expr->data.apply.left);
+      free_ul_expr(expr->data.apply.right);
+      free(expr);
+    } break;
+
+    case UL_paren: {
+      free_ul_expr(expr->data.expr);
+      free(expr);
+    } break;
+  }
+}
+
 UL_expression* ul_name(char var) {
   UL_expression* expr = alloc_ul_expr();
   expr->kind = UL_name;
@@ -343,18 +369,25 @@ UL_expression example_var = { .kind = UL_name, .data = { .name = 'x'}};
 UL_expression example_out = { .kind = UL_function, .data = { .lambda = { .name = 'x', .body = &example_var}}};
 UL_expression* t_expr = NULL;
 
+void test();
+
 int main(int argc, char* argv[]) {
-  UL_expression* expr = alloc_ul_expr();
+  // Run tests
+  test();
+}
 
-  char* src = example_in;
-
-  if (t_expr = read_expr(&src)) {
-    printf("\nWe read a thing!\n");
-    // print_expr(expr);
-  } else {
-    printf("\nWe read nothing...\n");
-  }
-
+void test_read(char* test_var, char* res_var) {
+  printf("Testing: '%s'. Should result in: '%s'. Actual: '", test_var, res_var);
+  UL_expression* t_expr = read_expr(&test_var);
   print_expr(t_expr);
+  free_ul_expr(t_expr);
+  printf("'\n");
+}
+
+void test() {
+  test_read("x", "x");
+  test_read("\\x.x", "\\x.x");
+  test_read("(\\x.x)y", "(\\x.x)y");
+  test_read("\\x.xy(\\y.x(zde)yab)", "\\x.xy(\\y.x(zde)yab)");
 }
 
