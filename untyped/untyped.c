@@ -75,13 +75,13 @@ void EXPECT_OR_EXPLODE(char expected, char token, char* fail_text) {
   }
 }
 
-#define WATCH 0
+#define WATCH 1
 
 #include <Windows.h>
 void P(char c) {
 #if WATCH
   printf("%c", c);
-  Sleep(100);
+  Sleep(500);
 #endif
 }
 
@@ -154,6 +154,25 @@ UL_expression* ul_application(UL_expression* left, UL_expression* right) {
   return expr;
 }
 
+char* sprint_expr(UL_expression* expr) {
+  if (!expr) { EXPLOSION("EXPRESSION IS NULL!!!"); }
+
+  size_t len = 0;
+  char* str;
+  switch (expr->kind) {
+    case UL_name: {
+      str = (char*)malloc(sizeof(char));
+      str[0] = expr->data.name;
+    } break;
+
+    case UL_function: {
+
+    }
+  }
+
+  return str;
+}
+
 // Lets get some printing done, so we can see the fruits of our labors!
 // We want to make sure that we are getting what we expect, while also enabling us
 // to copy-and-paste the results of our explorations back into the program.
@@ -199,17 +218,18 @@ UL_expression* read_fun(char* src[]);
 UL_expression* read_paren(char* src[]);
 
 UL_expression* read_name(char* src[]) {
-  P('v');
+  P('_');
   char* orig = *src;
   UL_expression* expr;
 
   skip_whitespace(src);
+printf("%c", *src[0]);
   if (varchar_p(*src[0])) {
     expr = ul_name(*src[0]);
     *src = *src + 1;
     return expr;
   }
-
+Sleep(5000);
   // Didn't find what we are looking for
   *src = orig;
   Bk();
@@ -231,7 +251,8 @@ UL_expression* read_paren(char* src[]) {
   UL_expression* expr = read_expr(src);
 
   EXPECT_OR_EXPLODE(')', *src[0], "Mismatched Parens!!! EXPLOSION!!!!");
-
+  P(')');
+  *src = *src + 1;
   return expr;
 }
 
@@ -332,7 +353,16 @@ UL_expression example_var = { .kind = UL_name, .data = { .name = 'x'}};
 UL_expression example_out = { .kind = UL_function, .data = { .lambda = { .name = 'x', .body = &example_var}}};
 UL_expression* t_expr = NULL;
 
+// Test functions, just the prototypes though, cause C
+bool test_variables();
+bool test_function();
+bool test_apply();
+bool test_paren();
+bool test_multi();
+
 int main(int argc, char* argv[]) {
+  printf("Starting...\n");
+
   UL_expression* expr = alloc_ul_expr();
 
   char* src = t_par;
@@ -347,3 +377,8 @@ int main(int argc, char* argv[]) {
   print_expr(t_expr);
 }
 
+bool test_variables();
+bool test_function();
+bool test_apply();
+bool test_paren();
+bool test_multi();
