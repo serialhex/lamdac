@@ -63,33 +63,11 @@
  * in our minds...
  */
 
-// Just some convience functions for error checking & stuff...
-void EXPLOSION(char* text) {
-  fputs(text, stderr);
-  exit(1);
-}
+// Various Includes
+#include "debug.h"
 
-void EXPECT_OR_EXPLODE(char expected, char token, char* fail_text) {
-  if (!(expected == token)) {
-    EXPLOSION(fail_text);
-  }
-}
-
-#define WATCH 1
-
-#include <Windows.h>
-void P(char c) {
-#if WATCH
-  printf("%c", c);
-  Sleep(500);
-#endif
-}
-
-void Bk() {
-#if WATCH
-  printf("\b \b");
-#endif
-}
+#define Stringification_Implementationification
+#include "strings.h"
 
 // I guess the first thing is a set of enums for the kinds of things we are dealing
 // with and a struct describing our data.
@@ -223,13 +201,12 @@ UL_expression* read_name(char* src[]) {
   UL_expression* expr;
 
   skip_whitespace(src);
-printf("%c", *src[0]);
   if (varchar_p(*src[0])) {
     expr = ul_name(*src[0]);
     *src = *src + 1;
     return expr;
   }
-Sleep(5000);
+  
   // Didn't find what we are looking for
   *src = orig;
   Bk();
@@ -308,7 +285,8 @@ UL_expression* read_app(char* src[]) {
       // right-branch
       UL_expression* r_expr;
       orig = *src;
-      if (r_expr = read_expr(src)) {
+      r_expr = read_expr(src);
+      if (r_expr) {
         return ul_application(l_expr, r_expr);
       } else {
         *src = orig;
@@ -327,7 +305,8 @@ UL_expression* read_expr(char* src[]) {
   char* orig = *src;
   UL_expression* expr;
 
-  if (expr = read_app(src)) {
+  expr = read_app(src);
+  if (expr) {
      // good stuff happened!
      return expr;
    }
@@ -367,7 +346,8 @@ int main(int argc, char* argv[]) {
 
   char* src = t_par;
 
-  if (t_expr = read_expr(&src)) {
+  t_expr = read_expr(&src);
+  if (t_expr) {
     printf("\nWe read a thing!\n");
     // print_expr(expr);
   } else {
@@ -377,8 +357,22 @@ int main(int argc, char* argv[]) {
   print_expr(t_expr);
 }
 
-bool test_variables();
-bool test_function();
-bool test_apply();
-bool test_paren();
-bool test_multi();
+bool test_variables() {
+  return false;
+}
+
+bool test_function() {
+  return false;
+}
+
+bool test_apply() {
+  return false;
+}
+
+bool test_paren() {
+  return false;
+}
+
+bool test_multi() {
+  return false;
+}

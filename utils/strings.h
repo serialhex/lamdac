@@ -40,3 +40,4 @@ void free_string(String* s) {
   }
 }
 
+#endif
