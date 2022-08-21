@@ -16,8 +16,8 @@ String* init_string(char* str);
 
 #endif
 
-// #define Stringification_Implementationification
 #ifdef Stringification_Implementationification
+// #define Stringification_Implementationification
 
 #include <string.h>
 String* init_string(char* str) {

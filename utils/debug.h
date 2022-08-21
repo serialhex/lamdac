@@ -1,5 +1,4 @@
 
-
 // Just some convience functions for error checking & stuff...
 void EXPLOSION(char* text) {
   fputs(text, stderr);

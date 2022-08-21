@@ -1,29 +1,49 @@
-/* The untyped lambda calculus
- * because i'm a fucking masochist
- *
- * This is going to be slightly different from typical lambda-calculus in one
- * major way: syntax.  As I'm typing on a keyboard in American, and I use
- * 'merican ass-key to encode all my letters, I don't have the fancy letter
- * lambda and also since I'm not using TeX I can't just type \lambda everywhere.
- *
- * So yeah, the basic syntax:
- *
- * variable    := "a".."z" | variable "'"
- * lambda-term := variable
- *              | "(" lambda-term lambda-term ")"
- *              | "\" variable "(" lambda-term ")"
- *              | "\" variable+ "." lambda-term
- *
- * Note that \x.yx is \x.(yx) and not (\x.y)x (abstraction extends as far right as possible)
- *
- * Maybe I'm making the syntax too complicated?  If I am, I'll scrap it and fix
- * it later... or something.
+/*
+ * First of all... some quick thanks:
  *
  * A lot of this is coming from the article "A Tutorial Introduction to the
  * Lambda Calculus" by Raul Rojas.  It's a really good paper describing the Lambda
  * calculus, and gives a good overview on everything.
  *
  * Also thanks to https://github.com/mpu/lambda/ for some of the code ideas.
+ */
+
+
+/* The Untyped Lambda Calculus
+ * ...because i'm a fucking masochist
+ *
+ * This is going to be slightly different from typical lambda-calculus in one
+ * major way: syntax.  As I'm typing on a keyboard in American, and I use
+ * 'merican ass-key to encode all my letters, I don't have the fancy letter
+ * lambda and also since I'm not using TeX I can't just type \lambda everywhere.
+ *
+ * Lambda expressions are defined recursively, like this:
+ *
+ *    <expression>  := <name>|<function>|<application>
+ *    <function>    := \<name>.<expression>
+ *    <application> := <expression> <expression>
+ *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
+ *                     This gives us 64 different characters to use in our functions
+ *
+ * Note that \x.yx is treated as \x.(yx) and not (\x.y)x (abstraction extends as far right as possible)
+ *
+ * But this is left-recursive, so we need to fix that and make something that
+ * isn't.  Also, it suffers from the fact that it ends as soon as it can.  This
+ * non-greedy behavior means that "x \y.x" only consumes the first variable, not
+ * the lambda term that follows.
+ *
+ *    <expression>  := <application>|<parens>|<function>|<name>
+ *    <function>    := \<name>.<expression>
+ *    <application> := ( <parens>|<function>|<name> ) <expression>
+ *    <parens>      := '(' <expression>+ ')' <expression>*
+ *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
+ *
+ * name, function and parens hasn't changed, but we changed the order for
+ * expression, and made application look for either a name or function, then
+ * some expression, that way it doesn't left-recurse all the time.
+ *
+ * So as we figure out how to represent all this, we need to keep all this shindig
+ * in our minds...
  */
 
 // some includes, so we can use exactly-specified numeric types, and not any of
@@ -35,38 +55,10 @@
 #include <stdbool.h>
 #include <ctype.h>
 
-/* Lambda expressions are defined recursively, like this:
- *
- *    <expression>  := <name>|<function>|<application>
- *    <function>    := \<name>.<expression>
- *    <application> := <expression> <expression>
- *    <parens>      := '(' <expression>+ ')'
- *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
- *                     This gives us 64 different characters to use in our functions
- *
- * But this is left-recursive, so we need to fix that and make something that
- * isn't.  Also, it suffers from the fact that it ends as soon as it can.  This
- * non-greedy behavior means that "x \y.x" only consumes the first variable, not
- * the lambda term that follows.
- *
- *    <expression>  := <application>|<parens>|<function>|<name>
- *    <function>    := \<name>.<expression>
- *    <application> := ( <parens>|<function>|<name> ) <expression>
- *    <parens>      := '(' <expression>+ ')'
- *    <name>        := 'a', 'b', 'c', ... 'X', 'Y', 'Z', '0', ... '9', '@', '#'
- *
- * name, function and parens hasn't changed, but we changed the order for
- * expression, and made application look for either a name or function, then
- * some expression, that way it doesn't left-recurse all the time.
- *
- * So as we figure out how to represent all this, we need to keep all this shindig
- * in our minds...
- */
-
 // Various Includes
 #include "debug.h"
 
-#define Stringification_Implementationification
+//#define Stringification_Implementationification
 #include "strings.h"
 
 // I guess the first thing is a set of enums for the kinds of things we are dealing
@@ -75,13 +67,16 @@ typedef enum {
   UL_name,
   UL_function,
   UL_application,
+  UL_paren,
 } UL_kind;
 
 struct UL_expression; // forward declaration... because... C!
 
 // the struct takes a "kind" and then the actual information is placed inside
 // the right spots (hopefully)
-typedef struct UL_expression { // BAH!!! https://www.reddit.com/r/c_language/comments/5qhs3s/mutually_recursive_types/dczssv8?utm_source=share&utm_medium=web2x&context=3
+typedef struct UL_expression {
+// BAH!!!
+// https://www.reddit.com/r/c_language/comments/5qhs3s/mutually_recursive_types/dczssv8?utm_source=share&utm_medium=web2x&context=3
   uint8_t kind;
 
   // We are using a union so we don't have *massive* wastes of space.
@@ -96,6 +91,8 @@ typedef struct UL_expression { // BAH!!! https://www.reddit.com/r/c_language/com
       struct UL_expression* right;
     } apply;
 
+    struct UL_expression* expr;
+
     char name;
   } data;
 } UL_expression;
@@ -107,6 +104,32 @@ UL_expression* alloc_ul_expr() {
     EXPLOSION("Ran out of memory, or something else equally bad...");
   }
   return expr;
+}
+
+void free_ul_expr(UL_expression* expr) {
+  if (expr == NULL) return;
+
+  switch (expr->kind) {
+    case UL_name: {
+      free(expr);
+    } break;
+
+    case UL_function: {
+      free_ul_expr(expr->data.lambda.body);
+      free(expr);
+    } break;
+
+    case UL_application: {
+      free_ul_expr(expr->data.apply.left);
+      free_ul_expr(expr->data.apply.right);
+      free(expr);
+    } break;
+
+    case UL_paren: {
+      free_ul_expr(expr->data.expr);
+      free(expr);
+    } break;
+  }
 }
 
 UL_expression* ul_name(char var) {
@@ -129,6 +152,13 @@ UL_expression* ul_application(UL_expression* left, UL_expression* right) {
   expr->kind = UL_application;
   expr->data.apply.left = left;
   expr->data.apply.right = right;
+  return expr;
+}
+
+UL_expression* ul_paren(UL_expression* paren) {
+  UL_expression* expr = alloc_ul_expr();
+  expr->kind = UL_paren;
+  expr->data.expr = paren;
   return expr;
 }
 
@@ -170,11 +200,15 @@ void print_expr(UL_expression* expr) {
     } break;
 
     case UL_application: {
-      printf("(");
       // RECURSE!!!
       if (expr->data.apply.left) { print_expr(expr->data.apply.left); }
       // TWICE!!!
       if (expr->data.apply.right) { print_expr(expr->data.apply.right); }
+    } break;
+
+    case UL_paren: {
+      printf("(");
+      print_expr(expr->data.expr);
       printf(")");
     } break;
   }
@@ -229,8 +263,10 @@ UL_expression* read_paren(char* src[]) {
 
   EXPECT_OR_EXPLODE(')', *src[0], "Mismatched Parens!!! EXPLOSION!!!!");
   P(')');
-  *src = *src + 1;
-  return expr;
+
+  *src = *src + 1; // nom the close
+
+  return ul_paren(expr);
 }
 
 UL_expression* read_fun(char* src[]) {
@@ -326,13 +362,14 @@ UL_expression* read_expr(char* src[]) {
 char* t_var = "x";
 char* t_fun = "\\x.x";
 char* t_app = "xy";
-char* t_par = "xy(za)bc";
-char* example_in = "x\\x.xy(\\y.x)";
+char* t_par = "xyd(zang)bc";
+char* example_in = "\\x.xy(\\y.x(zde)yab)";
 UL_expression example_var = { .kind = UL_name, .data = { .name = 'x'}};
 UL_expression example_out = { .kind = UL_function, .data = { .lambda = { .name = 'x', .body = &example_var}}};
 UL_expression* t_expr = NULL;
 
 // Test functions, just the prototypes though, cause C
+void test();
 bool test_variables();
 bool test_function();
 bool test_apply();
@@ -340,21 +377,23 @@ bool test_paren();
 bool test_multi();
 
 int main(int argc, char* argv[]) {
-  printf("Starting...\n");
+  // Run tests
+  test();
+}
 
-  UL_expression* expr = alloc_ul_expr();
-
-  char* src = t_par;
-
-  t_expr = read_expr(&src);
-  if (t_expr) {
-    printf("\nWe read a thing!\n");
-    // print_expr(expr);
-  } else {
-    printf("\nWe read nothing...\n");
-  }
-
+void test_read(char* test_var, char* res_var) {
+  printf("Testing: '%s'. Should result in: '%s'. Actual: '", test_var, res_var);
+  UL_expression* t_expr = read_expr(&test_var);
   print_expr(t_expr);
+  free_ul_expr(t_expr);
+  printf("'\n");
+}
+
+void test() {
+  test_read("x", "x");
+  test_read("\\x.x", "\\x.x");
+  test_read("(\\x.x)y", "(\\x.x)y");
+  test_read("\\x.xy(\\y.x(zde)yab)", "\\x.xy(\\y.x(zde)yab)");
 }
 
 bool test_variables() {
