@@ -58,7 +58,6 @@
 // Various Includes
 #include "debug.h"
 
-//#define Stringification_Implementationification
 #include "strings.h"
 
 // I guess the first thing is a set of enums for the kinds of things we are dealing
@@ -379,6 +378,13 @@ bool test_multi();
 int main(int argc, char* argv[]) {
   // Run tests
   test();
+
+	String* s = init_string("Testo");
+	printf("read a string\n");
+	free_string(s);
+	printf("freed a string!\n");
+
+	return 0;
 }
 
 void test_read(char* test_var, char* res_var) {
@@ -415,3 +421,4 @@ bool test_paren() {
 bool test_multi() {
   return false;
 }
+
