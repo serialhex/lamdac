@@ -43,11 +43,11 @@ void free_string(String* s) {
 }
 
 bool str_eq(String* s1, String* s2) {
-  if (s1->length != s2->length) {
+  if (s1->len != s2->len) {
     return false;
   }
 
-  if (strcmp(s1->str, s2->str) == 0)) {
+  if (strcmp(s1->str, s2->str) == 0) {
     return true;
   }
 
