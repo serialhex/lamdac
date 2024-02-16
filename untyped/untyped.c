@@ -239,7 +239,7 @@ UL_expression* read_name(char* src[]) {
     *src = *src + 1;
     return expr;
   }
-  
+
   // Didn't find what we are looking for
   *src = orig;
   Bk();
@@ -379,12 +379,12 @@ int main(int argc, char* argv[]) {
   // Run tests
   test();
 
-	String* s = init_string("Testo");
-	printf("read a string\n");
-	free_string(s);
-	printf("freed a string!\n");
+  String* s = init_string("Testo");
+  printf("read a string\n");
+  free_string(s);
+  printf("freed a string!\n");
 
-	return 0;
+  return 0;
 }
 
 void test_read(char* test_var, char* res_var) {

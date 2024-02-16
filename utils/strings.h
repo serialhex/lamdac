@@ -1,5 +1,5 @@
 /*
-  Because C doesn'e have any proper String-handling functions,
+  Because C doesn't have any proper String-handling functions,
   I gotta build em... including types... -_-
 */
 
