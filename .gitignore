@@ -1,4 +1,5 @@
 lambdac research/
 bin/
+ref/
 *.exe
 *.obj
