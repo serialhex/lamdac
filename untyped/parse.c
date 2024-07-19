@@ -29,6 +29,32 @@
 #include "parse.h"
 #include "utils.h"
 
+void free_ul_expr(UL_expression* expr) {
+  if (expr == NULL) return;
+
+  switch (expr->kind) {
+    case UL_name: {
+      free(expr);
+    } break;
+
+    case UL_function: {
+      free_ul_expr(expr->data.lambda.body);
+      free(expr);
+    } break;
+
+    case UL_application: {
+      free_ul_expr(expr->data.apply.left);
+      free_ul_expr(expr->data.apply.right);
+      free(expr);
+    } break;
+
+    case UL_paren: {
+      free_ul_expr(expr->data.expr);
+      free(expr);
+    } break;
+  }
+}
+
 UL_expression* alloc_ul_expr() {
   UL_expression* expr = (UL_expression*)malloc(sizeof(UL_expression));
   if (!expr) {
@@ -245,4 +271,3 @@ UL_expression* read_ul(char* src[]) {
   P('\n');
   return expr;
 }
-

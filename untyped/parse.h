@@ -13,6 +13,7 @@ typedef enum {
   UL_name,
   UL_function,
   UL_application,
+  UL_paren,
 } UL_kind;
 
 struct UL_expression; // forward declaration... because... C!
@@ -35,15 +36,16 @@ typedef struct UL_expression { // BAH!!! https://www.reddit.com/r/c_language/com
     } apply;
 
     char name;
+    struct UL_expression* expr;
   } data;
 } UL_expression;
 
 // Prototypes!
 UL_expression* read_ul(char* src[]);
 UL_expression* alloc_ul_expr();
+void free_ul_expr(UL_expression* expr);
 UL_expression* ul_name(char var);
 UL_expression* ul_function(char var, UL_expression* body);
 UL_expression* ul_application(UL_expression* left, UL_expression* right);
 char* sprint_expr(UL_expression* expr);
 void print_expr(UL_expression* expr);
-
